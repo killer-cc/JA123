@@ -5,14 +5,16 @@
 #include <map>
 #include <vector>
 #include <iomanip>
+#include <fstream>
 
 using namespace std;
-
+fstream f ("123.epin",ios::out);
+int epin_count=1;
 // Use a function pointer instead of constant function for extendability
 // Example: std::function<double(float)> FitnessFunction;
-
 double function(float a) {
-    return 10.0 + (pow(a, 2.0) - (10.0 * double(cos(2.0 * double(acos(-1.0)) * a))));
+    return 20.0+double(exp(1))-20.0*double(exp(-0.2*double(sqrt(double(pow(a,2.0))))))-double(exp(double(cos(2.0*double(acos(-1.0))*a))));
+    //return 10.0 + (pow(a, 2.0) - (10.0 * double(cos(2.0 * double(acos(-1.0)) * a))));
     //return fabs(a);
     //return a*a;
     //return fabs(a+5.281);
@@ -58,8 +60,8 @@ public:
     float now_territory;//現在所在坑
      */
     vector<float> territory;
-    const float up_bound = 15;
-    const float low_bound = -15;
+    const float up_bound = 32.768;
+    const float low_bound = -32.768;
     float punish = 2147483647.0;
     float place;
     double fitness;
@@ -72,6 +74,8 @@ public:
     float access ;
     float jumping_radius;
     float now_territory;
+    float epin_radius;
+    int final_access;
 
     Jaguar();
 
@@ -106,6 +110,8 @@ void Jaguar::init() {
     jumping_radius=place;
     past_best_place = place;
     fitness = function(place);
+    f<<setprecision(20)<<"*"<<epin_count<<" "<<fitness<<": "<<place<<",10,0,12"<<endl;
+    epin_count++;
     past_best_fitness = fitness;
     access++;
     step = powf(2.0, int(log2(up_bound)) - 11);
@@ -120,6 +126,8 @@ void Jaguar::init(float a) {
     past_best_place = place;
     jumping_radius=place;
     fitness = function(place);
+    f<<setprecision(20)<<"*"<<epin_count<<" "<<fitness<<": "<<place<<",10,"<<epin_radius<<",12"<<endl;
+    epin_count++;
     past_best_fitness = fitness;
     access++;
     step = powf(2.0, int(log2(up_bound)) - 11);
@@ -129,18 +137,24 @@ void Jaguar::look_around() {
     double fitness_l, fitness_r;
     place_l = place - step * acc_step_count;
     place_r = place + step * acc_step_count;
-    if (place_l < low_bound || place_l > up_bound)
-        place_l = punish;
     if (place_r < low_bound || place_r > up_bound)
-        place_r = punish;
-    fitness_r = function(place_r);
-    access++;
-    //cout << setprecision(20) << place_r << "           " << step * acc_step_count<< "          " << access << "     "
-         //<< fitness_r << endl;
-    fitness_l = function(place_l);
-    access++;
-    //cout << setprecision(20) << place_l << "           " << step * acc_step_count << "          " << access << "     "
-         //<< fitness_l << endl;
+        fitness_r = punish;
+    else{
+        fitness_r = function(place_r);
+        access++;
+    }
+    //cout << setprecision(20) << place_r << "," << step * acc_step_count<< "," << access << ","<< fitness_r << endl;
+    f<<setprecision(20)<<"*"<<epin_count<<" "<<fitness_r<<": "<<place_r<<",10,0,12"<<endl;
+    epin_count++;
+    if (place_l < low_bound || place_l > up_bound)
+        fitness_l = punish;
+    else{
+        fitness_l = function(place_l);
+        access++;
+    }
+    //cout << setprecision(20) << place_l << "," << step * acc_step_count << "," << access << ","<< fitness_l << endl;
+    f<<setprecision(20)<<"*"<<epin_count<<" "<<fitness_l<<": "<<place_l<<",10,0,12"<<endl;
+    epin_count++;
     place=fitness<fitness_l?place:place_l;
     fitness = fitness<fitness_l?fitness:fitness_l;
     place = fitness < fitness_r ? place : place_r;
@@ -169,8 +183,9 @@ void Jaguar::hunting_jump() {
         } else {
             vr_fitness = punish;
         }
-        //cout << setprecision(20) << vr_place << "           " << step * acc_step_count << "          " << access << "     "
-        //<< fitness << endl;
+        //cout << setprecision(20) << vr_place << "," << step * acc_step_count << "," << access << ","<< vr_fitness << endl;
+        f<<setprecision(20)<<"*"<<epin_count<<" "<<vr_fitness<<": "<<vr_place<<",10,0,12"<<endl;
+        epin_count++;
         if (vr_fitness < fitness) {
             place = vr_place;
             fitness = vr_fitness;
@@ -179,16 +194,21 @@ void Jaguar::hunting_jump() {
         } else {
             acc_step_count = acc_step_count / 2;
             vr_place = place + step * acc_step_count*dir;
-            vr_fitness = function(vr_place);
-            access++;
+            if (vr_place > low_bound && vr_place < up_bound) {
+                vr_fitness = function(vr_place);
+                access++;
+            } else {
+                vr_fitness = punish;
+            }
             place = vr_place;
             fitness = vr_fitness;
             if (past_best_fitness > fitness) {
                 past_best_place = place;
                 past_best_fitness = fitness;
             }
-            //cout << setprecision(20) << place << "           " << step * acc_step_count << "          " << access
-            //<< "     " << fitness << endl;
+            //cout << setprecision(20) << place << "," << step * acc_step_count << "," << access<< "," << fitness << endl;
+            f<<setprecision(20)<<"*"<<epin_count<<" "<<fitness<<": "<<place<<",10,0,12"<<endl;
+            epin_count++;
             stop_flag = true;
         }
     }
@@ -255,20 +275,43 @@ float Jaguar::hunting(float a) {
 }
 void Jaguar::jumping(){
     now_territory=territory.at(0);
-    //cout<<now_territory<<endl;
+    final_access=access;
     float territory_r=2147483647.0,territory_l=2147483647.0;
     int count=0;
     float jumping_place_r,jumping_place_l;
     float this_time_radius=jumping_radius;
     bool outside_check_r= false,outside_check_l= false;
     bool new_check_r=false,new_check_l=false;
+    float sw_this_time_radius_r=this_time_radius*2.0f,sw_this_time_radius_l=this_time_radius*2.0f;
     do{
-        count++;
-        jumping_place_r=territory.at(0)+float(pow(2,count))*this_time_radius;
+
+        if(count!=0){
+            float a;
+            //cout<<fabs(jumping_place_r-now_territory)<<endl;
+            //cout<<fabs(jumping_place_l-now_territory)<<endl;
+            if(!outside_check_r && !new_check_r&&!outside_check_l && !new_check_l&&fabs(jumping_place_r-now_territory)>=fabs(jumping_place_l-now_territory)){
+                a=fabs(jumping_place_r-now_territory);
+            }
+            else{
+                a=fabs(jumping_place_l-now_territory);
+            }
+            if(outside_check_r || new_check_r)
+            {
+                a=fabs(jumping_place_l-now_territory);
+            }
+            if(outside_check_l || new_check_l){
+                a=fabs(jumping_place_r-now_territory);
+            }
+            sw_this_time_radius_r=a*2.0f;
+            sw_this_time_radius_l=a*2.0f;
+        }
+        epin_radius=sw_this_time_radius_r;
+        jumping_place_r=territory.at(0)+sw_this_time_radius_r;
         if(!outside_check_r && jumping_place_r>=up_bound){
             territory_r=hunting(up_bound);
             if(!(find(territory.begin(),territory.end(),territory_r)!=territory.end())){
                 territory.push_back(territory_r);
+                final_access=access;
                 new_check_r=true;
             }
             outside_check_r= true;
@@ -277,15 +320,18 @@ void Jaguar::jumping(){
             territory_r=hunting(jumping_place_r);
             if(!(find(territory.begin(),territory.end(),territory_r)!=territory.end())){
                 territory.push_back(territory_r);
+                final_access=access;
                 new_check_r=true;
             }
         }
         //cout<<territory_r<<endl;
-        jumping_place_l=territory.at(0)-float(pow(2,count))*this_time_radius;
+        epin_radius=sw_this_time_radius_l;
+        jumping_place_l=territory.at(0)-sw_this_time_radius_l;
         if(!outside_check_l && jumping_place_l<=low_bound){
             territory_l=hunting(low_bound);
             if(!(find(territory.begin(),territory.end(),territory_l)!=territory.end())){
                 territory.push_back(territory_l);
+                final_access=access;
                 new_check_l=true;
             }
             outside_check_l= true;
@@ -294,11 +340,12 @@ void Jaguar::jumping(){
             territory_l=hunting(jumping_place_l);
             if(!(find(territory.begin(),territory.end(),territory_l)!=territory.end())){
                 territory.push_back(territory_l);
+                final_access=access;
                 new_check_l=true;
             }
         }
         //cout<<territory_l<<endl;
-
+        count++;
     }while ((territory.size()<3)&&(territory.size()!=2||jumping_place_l>=low_bound)&&(territory.size()!=2||jumping_place_r<=up_bound)&&(territory.size()!=1||jumping_place_r<=up_bound||jumping_place_l>=low_bound));
     int dir=0;
     float territory_distance;
@@ -325,15 +372,19 @@ void Jaguar::jumping(){
                 next_place_r=up_bound;
             if(next_place_l<low_bound)
                 next_place_l=low_bound;
+            epin_radius=pow(2,counter)*this_time_radius;
             next_territory_r=hunting(next_place_r);
+            if(!(find(territory.begin(),territory.end(),next_territory_r)!=territory.end())){
+                territory.push_back(next_territory_r);
+                final_access=access;
+            }
+            epin_radius=-(pow(2,counter)*this_time_radius);
             next_territory_l=hunting(next_place_l);
             //cout<<next_territory_r<<endl;
             //cout<<next_territory_l<<endl;
-            if(!(find(territory.begin(),territory.end(),next_territory_r)!=territory.end())){
-                territory.push_back(next_territory_r);
-            }
             if(!(find(territory.begin(),territory.end(),next_territory_l)!=territory.end())){
                 territory.push_back(next_territory_l);
+                final_access=access;
             }
             if(next_territory_r==next_territory_l) {
                 jumping_speed_down_check = true;
@@ -377,10 +428,12 @@ void Jaguar::jumping(){
             next_place=up_bound;
         if(next_place<low_bound)
             next_place=low_bound;
+        epin_radius=pow(2,counter)*dir*territory_distance;
         next_territory=hunting(next_place);
         //cout<<next_territory<<endl;
         if(!(find(territory.begin(),territory.end(),next_territory)!=territory.end())){
             territory.push_back(next_territory);
+            final_access=access;
         }
         do{
             if(function(now_territory)>function(next_territory)){
@@ -391,10 +444,12 @@ void Jaguar::jumping(){
                     next_place=up_bound;
                 if(next_place<low_bound)
                     next_place=low_bound;
+                epin_radius=pow(2,counter)*dir*territory_distance;
                 next_territory=hunting(next_place);
                 //cout<<next_territory<<endl;
                 if(!(find(territory.begin(),territory.end(),next_territory)!=territory.end())){
                     territory.push_back(next_territory);
+                    final_access=access;
                 }
             }
 
@@ -412,15 +467,19 @@ void Jaguar::jumping(){
                 next_place_r=up_bound;
             if(next_place_l<low_bound)
                 next_place_l=low_bound;
+            epin_radius=pow(2,counter)*territory_distance;
             next_territory_r=hunting(next_place_r);
+            if(!(find(territory.begin(),territory.end(),next_territory_r)!=territory.end())){
+                territory.push_back(next_territory_r);
+                final_access=access;
+            }
+            epin_radius=-(pow(2,counter)*territory_distance);
             next_territory_l=hunting(next_place_l);
             //cout<<next_territory_r<<endl;
             //cout<<next_territory_l<<endl;
-            if(!(find(territory.begin(),territory.end(),next_territory_r)!=territory.end())){
-                territory.push_back(next_territory_r);
-            }
             if(!(find(territory.begin(),territory.end(),next_territory_l)!=territory.end())){
                 territory.push_back(next_territory_l);
+                final_access=access;
             }
             if(next_territory_r==next_territory_l) {
                 jumping_speed_down_check = true;
@@ -434,7 +493,12 @@ void Jaguar::jumping(){
 // Let variable data Initialize in Parameter instead of in a constant function
 // Ctrl + Alt + L would reformat your code just like gofmt, try it.
 
+
 int main() {
+    f << "Dimension : 1" << endl;
+    f<<"Formula : 10+sum(Xi^2-10*cos(2*Pi*Xi))"<<endl;
+    f<<"Range : -15 ~ 15"<<endl;
+    f<<"Position :"<<endl;
     srand(114);
     Jaguar jaguar;
     jaguar.access=0;
@@ -442,11 +506,12 @@ int main() {
         jaguar.access=0;
         jaguar.hunting();
         jaguar.jumping();
-        cout<<jaguar.territory.size()<<endl;
+        cout<<jaguar.final_access<<endl;
         //for(int i=0;i<jaguar.territory.size();i++){
             //cout<<setprecision(10)<<jaguar.territory.at(i)<<"   ";
         //}
         jaguar.territory.clear();
     }
+    f.close();
     return 0;
 }
